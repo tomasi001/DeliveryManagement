@@ -3,12 +3,17 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { processPdf } from "@/app/actions/process-pdf";
 import { extractWacFromImage } from "@/app/actions/extract-wac";
 import { createSessionWithArtworks } from "@/app/actions/create-session";
 import { getSessions } from "@/app/actions/get-sessions";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  CardDescription,
+} from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +26,21 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileText, UploadCloud, Loader2, RefreshCcw, X, CheckCircle2, History, ChevronRight, Package, User, ArrowLeft } from "lucide-react";
+import {
+  FileText,
+  UploadCloud,
+  Loader2,
+  RefreshCcw,
+  X,
+  CheckCircle2,
+  History,
+  ChevronRight,
+  Package,
+  User,
+  ArrowLeft,
+  Pencil,
+  Check,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import type { Session } from "@/types";
@@ -40,31 +59,40 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-neutral-50/50 p-6 flex items-start justify-center pt-10">
       <div className="w-full max-w-2xl space-y-6">
         <div className="flex items-center gap-4">
-            <Link href="/">
-                <Button variant="ghost" size="icon" className="rounded-full">
-                    <ArrowLeft className="w-5 h-5" />
-                </Button>
-            </Link>
-            <h1 className="text-3xl font-bold tracking-tight text-neutral-900">Admin Dashboard</h1>
+          <Link href="/">
+            <Button variant="ghost" size="icon" className="rounded-full">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+          </Link>
+          <h1 className="text-3xl font-bold tracking-tight text-neutral-900">
+            Admin Dashboard
+          </h1>
         </div>
-        <p className="text-neutral-500 pl-14 -mt-4">Manage delivery sessions and manifests</p>
+        <p className="text-neutral-500 pl-14 -mt-4">
+          Manage delivery sessions and manifests
+        </p>
 
-        <Tabs defaultValue="upload" value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs
+          defaultValue="upload"
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="w-full"
+        >
           <TabsList className="grid w-full grid-cols-2 mb-6">
             <TabsTrigger value="upload" className="flex items-center gap-2">
-                <UploadCloud className="w-4 h-4" />
-                Upload Manifest
+              <UploadCloud className="w-4 h-4" />
+              Upload Manifest
             </TabsTrigger>
             <TabsTrigger value="history" className="flex items-center gap-2">
-                <History className="w-4 h-4" />
-                Session History
+              <History className="w-4 h-4" />
+              Session History
             </TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="upload" className="mt-0">
             <UploadManifestView />
           </TabsContent>
-          
+
           <TabsContent value="history" className="mt-0">
             <HistoryView />
           </TabsContent>
@@ -79,17 +107,21 @@ function UploadManifestView() {
   const [statusText, setStatusText] = useState("Processing Manifest...");
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
-  
+
   // Review State
   const [reviewOpen, setReviewOpen] = useState(false);
-  const [extractedArtworks, setExtractedArtworks] = useState<ScannedArtwork[]>([]);
+  const [extractedArtworks, setExtractedArtworks] = useState<ScannedArtwork[]>(
+    []
+  );
   const [creatingSession, setCreatingSession] = useState(false);
-  
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState<ScannedArtwork | null>(null);
+
   // Client Details State
   const [clientDetails, setClientDetails] = useState({
     name: "",
     email: "",
-    address: ""
+    address: "",
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -102,32 +134,11 @@ function UploadManifestView() {
     }
 
     setLoading(true);
-    setStatusText("Processing text layer...");
+    setStatusText("Analyzing manifest with AI...");
     setError(null);
 
-    const formData = new FormData();
-    formData.append("file", file);
-
     try {
-      // 1. Try standard text extraction
-      const result = await processPdf(formData);
-      
-      if (result.success && result.codes && result.codes.length > 0) {
-        // Map string codes to artwork objects
-        const artworks = result.codes.map(code => ({ wacCode: code }));
-        openReview(artworks);
-        return;
-      }
-
-      // 2. Fallback to AI Vision
-      if (result.error && result.error.includes("image")) {
-        console.warn("Text extraction failed. Falling back to AI Vision...");
-        await handleAiFallback(file);
-      } else {
-         setError(result.error || "Unknown error");
-         setLoading(false);
-      }
-
+      await processPdfWithAi(file);
     } catch (err) {
       console.error("Upload error:", err);
       setError("An unexpected error occurred");
@@ -135,41 +146,66 @@ function UploadManifestView() {
     }
   }
 
-  async function handleAiFallback(file: File) {
-     try {
-        setStatusText("Analyzing scanned document with AI...");
-        
-        const pdfjsLib = await import("pdfjs-dist");
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+  async function processPdfWithAi(file: File) {
+    try {
+      const pdfjsLib = await import("pdfjs-dist");
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-        const page = await pdf.getPage(1);
-        
-        const viewport = page.getViewport({ scale: 1.5 });
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+
+      // Process all pages
+      const allArtworks: ScannedArtwork[] = [];
+
+      for (let i = 1; i <= pdf.numPages; i++) {
+        setStatusText(`Analyzing page ${i} of ${pdf.numPages}...`);
+        const page = await pdf.getPage(i);
+
+        const viewport = page.getViewport({ scale: 2.0 }); // Higher scale for better OCR
         const canvas = document.createElement("canvas");
         const context = canvas.getContext("2d");
         canvas.height = viewport.height;
         canvas.width = viewport.width;
 
         if (context) {
-            await page.render({ canvasContext: context, viewport }).promise;
-            const base64Image = canvas.toDataURL("image/jpeg", 0.8);
+          await page.render({
+            canvasContext: context,
+            viewport,
+            canvas: canvas as any,
+          }).promise;
+          const base64Image = canvas.toDataURL("image/jpeg", 0.8);
 
-            const aiResult = await extractWacFromImage(base64Image);
+          const aiResult = await extractWacFromImage(base64Image);
 
-            if (aiResult.success && aiResult.data) {
-                 openReview(aiResult.data);
-            } else {
-                setError("AI could not find any artwork details.");
-                setLoading(false);
-            }
+          if (aiResult.success && aiResult.data) {
+            allArtworks.push(
+              ...(aiResult.data as any[]).map((item) => ({
+                wacCode: item.wacCode,
+                artist: item.artist || undefined,
+                title: item.title || undefined,
+                dimensions: item.dimensions || undefined,
+              }))
+            );
+          }
         }
-     } catch (err) {
-        console.error("AI Fallback Error:", err);
-        setError("Failed to process scanned document.");
+      }
+
+      if (allArtworks.length > 0) {
+        // Deduplicate by WAC code
+        const uniqueArtworks = allArtworks.filter(
+          (art, index, self) =>
+            index === self.findIndex((t) => t.wacCode === art.wacCode)
+        );
+        openReview(uniqueArtworks);
+      } else {
+        setError("AI could not find any artwork details in the document.");
         setLoading(false);
-     }
+      }
+    } catch (err) {
+      console.error("AI Processing Error:", err);
+      setError("Failed to process document with AI.");
+      setLoading(false);
+    }
   }
 
   function openReview(artworks: ScannedArtwork[]) {
@@ -179,24 +215,49 @@ function UploadManifestView() {
   }
 
   function removeArtwork(indexToRemove: number) {
-    setExtractedArtworks((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+    setExtractedArtworks((prev) =>
+      prev.filter((_, idx) => idx !== indexToRemove)
+    );
+  }
+
+  function startEditing(index: number, artwork: ScannedArtwork) {
+    setEditingIndex(index);
+    setEditForm({ ...artwork });
+  }
+
+  function cancelEditing() {
+    setEditingIndex(null);
+    setEditForm(null);
+  }
+
+  function saveEditing() {
+    if (editingIndex !== null && editForm) {
+      setExtractedArtworks((prev) =>
+        prev.map((item, idx) => (idx === editingIndex ? editForm : item))
+      );
+      setEditingIndex(null);
+      setEditForm(null);
+    }
   }
 
   async function confirmSessionCreation() {
     if (extractedArtworks.length === 0) return;
     if (!clientDetails.name || !clientDetails.email) {
-        alert("Please provide client name and email.");
-        return;
+      alert("Please provide client name and email.");
+      return;
     }
-    
+
     setCreatingSession(true);
-    const result = await createSessionWithArtworks(extractedArtworks, clientDetails);
-    
+    const result = await createSessionWithArtworks(
+      extractedArtworks,
+      clientDetails
+    );
+
     if (result.success && result.sessionId) {
-        router.push(`/admin/session/${result.sessionId}`);
+      router.push(`/admin/session/${result.sessionId}`);
     } else {
-        alert("Failed to create session: " + result.error);
-        setCreatingSession(false);
+      alert("Failed to create session: " + result.error);
+      setCreatingSession(false);
     }
   }
 
@@ -211,7 +272,8 @@ function UploadManifestView() {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) handleFiles(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files && e.dataTransfer.files[0])
+      handleFiles(e.dataTransfer.files[0]);
   };
 
   return (
@@ -255,7 +317,9 @@ function UploadManifestView() {
                     type="file"
                     id="file-upload"
                     accept=".pdf"
-                    onChange={(e) => e.target.files?.[0] && handleFiles(e.target.files[0])}
+                    onChange={(e) =>
+                      e.target.files?.[0] && handleFiles(e.target.files[0])
+                    }
                   />
                   <label
                     htmlFor="file-upload"
@@ -271,8 +335,10 @@ function UploadManifestView() {
                     onDrop={handleDrop}
                   >
                     <div className="z-10 flex flex-col items-center pointer-events-none">
-                       <FileText className="w-8 h-8 text-neutral-400 group-hover:text-brand-primary transition-colors mb-4" />
-                       <p className="text-lg font-medium text-neutral-700">Click to upload or drag & drop</p>
+                      <FileText className="w-8 h-8 text-neutral-400 group-hover:text-brand-primary transition-colors mb-4" />
+                      <p className="text-lg font-medium text-neutral-700">
+                        Click to upload or drag & drop
+                      </p>
                     </div>
                   </label>
                 </motion.div>
@@ -301,95 +367,224 @@ function UploadManifestView() {
               Please enter client details and verify the extracted manifest.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="grid gap-4 py-4">
             <div className="space-y-4 border p-4 rounded-lg bg-neutral-50/50">
-                <div className="flex items-center gap-2 mb-2">
-                    <User className="w-4 h-4 text-brand-primary" />
-                    <h4 className="font-semibold text-sm">Client Information</h4>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="client-name">Client Name</Label>
-                        <Input 
-                            id="client-name" 
-                            placeholder="John Doe" 
-                            value={clientDetails.name}
-                            onChange={(e) => setClientDetails({...clientDetails, name: e.target.value})}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="client-email">Email Address</Label>
-                        <Input 
-                            id="client-email" 
-                            type="email" 
-                            placeholder="john@example.com"
-                            value={clientDetails.email}
-                            onChange={(e) => setClientDetails({...clientDetails, email: e.target.value})}
-                        />
-                    </div>
+              <div className="flex items-center gap-2 mb-2">
+                <User className="w-4 h-4 text-brand-primary" />
+                <h4 className="font-semibold text-sm">Client Information</h4>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="client-name">Client Name</Label>
+                  <Input
+                    id="client-name"
+                    placeholder="John Doe"
+                    value={clientDetails.name}
+                    onChange={(e) =>
+                      setClientDetails({
+                        ...clientDetails,
+                        name: e.target.value,
+                      })
+                    }
+                  />
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="client-address">Delivery Address</Label>
-                    <Input 
-                        id="client-address" 
-                        placeholder="123 Gallery Way, Cape Town"
-                        value={clientDetails.address}
-                        onChange={(e) => setClientDetails({...clientDetails, address: e.target.value})}
-                    />
+                  <Label htmlFor="client-email">Email Address</Label>
+                  <Input
+                    id="client-email"
+                    type="email"
+                    placeholder="john@example.com"
+                    value={clientDetails.email}
+                    onChange={(e) =>
+                      setClientDetails({
+                        ...clientDetails,
+                        email: e.target.value,
+                      })
+                    }
+                  />
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="client-address">Delivery Address</Label>
+                <Input
+                  id="client-address"
+                  placeholder="123 Gallery Way, Cape Town"
+                  value={clientDetails.address}
+                  onChange={(e) =>
+                    setClientDetails({
+                      ...clientDetails,
+                      address: e.target.value,
+                    })
+                  }
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
-                <h4 className="font-semibold text-sm">Extracted Items ({extractedArtworks.length})</h4>
-                <ScrollArea className="h-[200px] w-full rounded-md border p-4 bg-neutral-50/50">
-                    {extractedArtworks.length === 0 ? (
-                        <p className="text-center text-neutral-400 py-10">No items left.</p>
-                    ) : (
-                        <div className="space-y-3">
-                            {extractedArtworks.map((art, idx) => (
-                                <div key={idx} className="relative p-3 bg-white rounded-lg shadow-sm border border-neutral-100 group hover:border-brand-primary/30 transition-colors">
-                                    <button 
-                                        onClick={() => removeArtwork(idx)}
-                                        className="absolute top-2 right-2 text-neutral-400 hover:text-red-500 transition-colors"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                    
-                                    <div className="grid grid-cols-[1fr,auto] gap-4">
-                                        <div>
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className="font-mono text-xs font-bold bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded">
-                                                    {art.wacCode}
-                                                </span>
-                                            </div>
-                                            <h4 className="font-semibold text-neutral-900 text-sm">{art.title || "Untitled"}</h4>
-                                            <p className="text-xs text-neutral-500">{art.artist || "Unknown Artist"}</p>
-                                        </div>
-                                    </div>
+              <h4 className="font-semibold text-sm">
+                Extracted Items ({extractedArtworks.length})
+              </h4>
+              <ScrollArea className="h-[200px] w-full rounded-md border p-4 bg-neutral-50/50">
+                {extractedArtworks.length === 0 ? (
+                  <p className="text-center text-neutral-400 py-10">
+                    No items left.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {extractedArtworks.map((art, idx) => (
+                      <div
+                        key={idx}
+                        className="relative p-3 bg-white rounded-lg shadow-sm border border-neutral-100 group hover:border-brand-primary/30 transition-colors"
+                      >
+                        {editingIndex === idx ? (
+                          <div className="space-y-2 pr-8">
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="space-y-1">
+                                <Label
+                                  htmlFor={`edit-wac-${idx}`}
+                                  className="text-xs"
+                                >
+                                  WAC Code
+                                </Label>
+                                <Input
+                                  id={`edit-wac-${idx}`}
+                                  value={editForm?.wacCode || ""}
+                                  onChange={(e) =>
+                                    setEditForm((prev) =>
+                                      prev
+                                        ? { ...prev, wacCode: e.target.value }
+                                        : null
+                                    )
+                                  }
+                                  className="h-8 text-xs font-mono"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label
+                                  htmlFor={`edit-artist-${idx}`}
+                                  className="text-xs"
+                                >
+                                  Artist
+                                </Label>
+                                <Input
+                                  id={`edit-artist-${idx}`}
+                                  value={editForm?.artist || ""}
+                                  onChange={(e) =>
+                                    setEditForm((prev) =>
+                                      prev
+                                        ? { ...prev, artist: e.target.value }
+                                        : null
+                                    )
+                                  }
+                                  className="h-8 text-xs"
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              <Label
+                                htmlFor={`edit-title-${idx}`}
+                                className="text-xs"
+                              >
+                                Title
+                              </Label>
+                              <Input
+                                id={`edit-title-${idx}`}
+                                value={editForm?.title || ""}
+                                onChange={(e) =>
+                                  setEditForm((prev) =>
+                                    prev
+                                      ? { ...prev, title: e.target.value }
+                                      : null
+                                  )
+                                }
+                                className="h-8 text-xs"
+                              />
+                            </div>
+
+                            <div className="absolute top-2 right-2 flex flex-col gap-1">
+                              <button
+                                onClick={saveEditing}
+                                className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors"
+                                title="Save"
+                              >
+                                <Check className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={cancelEditing}
+                                className="p-1 text-neutral-400 hover:bg-neutral-100 rounded transition-colors"
+                                title="Cancel"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={() => startEditing(idx, art)}
+                                className="p-1 text-neutral-400 hover:text-brand-primary hover:bg-brand-primary/10 rounded transition-colors"
+                                title="Edit"
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                              <button
+                                onClick={() => removeArtwork(idx)}
+                                className="p-1 text-neutral-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                                title="Remove"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+
+                            <div className="grid grid-cols-[1fr,auto] gap-4">
+                              <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="font-mono text-xs font-bold bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded">
+                                    {art.wacCode}
+                                  </span>
                                 </div>
-                            ))}
-                        </div>
-                    )}
-                </ScrollArea>
+                                <h4 className="font-semibold text-neutral-900 text-sm">
+                                  {art.title || "Untitled"}
+                                </h4>
+                                <p className="text-xs text-neutral-500">
+                                  {art.artist || "Unknown Artist"}
+                                </p>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setReviewOpen(false)}>Cancel</Button>
-            <Button 
-                onClick={confirmSessionCreation} 
-                disabled={extractedArtworks.length === 0 || creatingSession || !clientDetails.name || !clientDetails.email}
+            <Button variant="outline" onClick={() => setReviewOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmSessionCreation}
+              disabled={
+                extractedArtworks.length === 0 ||
+                creatingSession ||
+                !clientDetails.name ||
+                !clientDetails.email
+              }
             >
               {creatingSession ? (
                 <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Creating...
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
                 </>
               ) : (
                 <>
-                    <CheckCircle2 className="w-4 h-4 mr-2" />
-                    Confirm & Create
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  Confirm & Create
                 </>
               )}
             </Button>
@@ -431,8 +626,8 @@ function HistoryView() {
     return (
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-12 text-neutral-400">
-            <Package className="w-12 h-12 mb-4 opacity-20" />
-            <p>No delivery sessions found.</p>
+          <Package className="w-12 h-12 mb-4 opacity-20" />
+          <p>No delivery sessions found.</p>
         </CardContent>
       </Card>
     );
@@ -441,28 +636,35 @@ function HistoryView() {
   return (
     <div className="space-y-4">
       {sessions.map((session) => (
-        <Link key={session.id} href={`/admin/session/${session.id}`} className="block">
+        <Link
+          key={session.id}
+          href={`/admin/session/${session.id}`}
+          className="block"
+        >
           <Card className="hover:border-brand-primary/50 transition-colors cursor-pointer">
             <CardContent className="p-4 flex items-center justify-between">
               <div>
                 <p className="text-sm text-neutral-500 font-mono mb-1">
                   {new Date(session.created_at).toLocaleDateString(undefined, {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
                   })}
                 </p>
                 <div className="flex items-center gap-2">
-                    <span className={cn(
-                        "w-2.5 h-2.5 rounded-full",
-                        session.status === 'active' ? "bg-green-500" : 
-                        session.status === 'ready_for_pickup' ? "bg-blue-500" : "bg-neutral-300"
-                    )} />
-                    <span className="font-medium capitalize text-neutral-900">
-                        {session.client_name || session.status.replace(/_/g, ' ')}
-                    </span>
+                  <span
+                    className={cn(
+                      "w-2.5 h-2.5 rounded-full",
+                      session.status === "archived"
+                        ? "bg-green-500"
+                        : "bg-blue-500"
+                    )}
+                  />
+                  <span className="font-medium capitalize text-neutral-900">
+                    {session.client_name || session.status.replace(/_/g, " ")}
+                  </span>
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-neutral-400" />

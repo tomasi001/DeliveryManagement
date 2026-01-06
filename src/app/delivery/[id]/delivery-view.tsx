@@ -62,6 +62,14 @@ export function DeliveryView({ session, initialArtworks }: DeliveryViewProps) {
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [updating, setUpdating] = useState(false);
 
+  // Complete Delivery Confirmation State
+  const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
+
+  // Manual Status Update State
+  const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null);
+  const [isManualUpdateOpen, setIsManualUpdateOpen] = useState(false);
+  const [manualUpdating, setManualUpdating] = useState(false);
+
   const handleScan = (items: AIScannedArtwork[]) => {
     // If archived, do nothing (scanning disabled)
     if (isArchived) return;
@@ -132,24 +140,52 @@ export function DeliveryView({ session, initialArtworks }: DeliveryViewProps) {
     setIsReviewOpen(false);
   };
 
-  async function handleComplete() {
-    if (
-      !confirm(
-        "Are you sure you want to complete this delivery? This will send emails to the client and admin."
-      )
-    )
-      return;
+  // Triggered by button click
+  function handleComplete() {
+    setIsCompleteDialogOpen(true);
+  }
+
+  // Triggered by dialog confirm
+  async function confirmCompletion() {
     setCompleting(true);
     const res = await completeDelivery(session.id);
     if (res.success) {
-      alert("Delivery completed successfully.");
       // Reload page to reflect archived status
       window.location.reload();
     } else {
       alert("Error completing delivery: " + (res.error || "Unknown error"));
+      setIsCompleteDialogOpen(false);
     }
     setCompleting(false);
   }
+
+  const handleManualUpdate = async (targetStatus: ArtworkStatus) => {
+    if (!selectedArtwork) return;
+
+    setManualUpdating(true);
+    try {
+      // Optimistic update
+      setArtworks((prev) =>
+        prev.map((a) =>
+          a.id === selectedArtwork.id ? { ...a, status: targetStatus } : a
+        )
+      );
+      await updateArtworkStatus(selectedArtwork.id, targetStatus, session.id);
+      setIsManualUpdateOpen(false);
+      setSelectedArtwork(null);
+    } catch (err) {
+      console.error("Manual update error:", err);
+      alert("Failed to update status.");
+    } finally {
+      setManualUpdating(false);
+    }
+  };
+
+  const openManualUpdate = (art: Artwork) => {
+    if (isArchived) return;
+    setSelectedArtwork(art);
+    setIsManualUpdateOpen(true);
+  };
 
   return (
     <div className="space-y-6 pb-20 p-4 pt-6 max-w-md mx-auto">
@@ -235,8 +271,9 @@ export function DeliveryView({ session, initialArtworks }: DeliveryViewProps) {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 layout
+                onClick={() => openManualUpdate(art)}
                 className={cn(
-                  "p-4 rounded-xl border flex items-center justify-between transition-colors duration-300 shadow-sm",
+                  "p-4 rounded-xl border flex items-center justify-between transition-all duration-300 shadow-sm cursor-pointer active:scale-[0.98]",
                   art.status === "delivered"
                     ? "bg-green-50/50 border-green-200 dark:bg-green-900/10 dark:border-green-900/30"
                     : art.status === "in_truck"
@@ -286,18 +323,26 @@ export function DeliveryView({ session, initialArtworks }: DeliveryViewProps) {
       </div>
 
       {mode === "delivering" && !isArchived && (
-        <div className="pt-4">
+        <div className="pt-4 px-1">
           <Button
             onClick={handleComplete}
             disabled={completing}
-            className="w-full h-14 text-lg font-semibold shadow-xl shadow-neutral-200/50 dark:shadow-none"
+            size="lg"
+            className="w-full h-14 text-lg font-bold bg-neutral-900 dark:bg-neutral-50 text-white dark:text-neutral-900 rounded-xl shadow-lg hover:opacity-90 transition-all active:scale-[0.98]"
           >
-            {completing ? "Finalizing..." : "Complete Delivery"}
+            {completing ? (
+              <>
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                Finalizing...
+              </>
+            ) : (
+              "Complete Delivery"
+            )}
           </Button>
         </div>
       )}
 
-      {/* Confirmation Dialog */}
+      {/* Scanned Items Confirmation Dialog */}
       <Dialog open={isReviewOpen} onOpenChange={setIsReviewOpen}>
         <DialogContent className="max-w-md bg-white dark:bg-neutral-950">
           <DialogHeader>
@@ -383,6 +428,176 @@ export function DeliveryView({ session, initialArtworks }: DeliveryViewProps) {
               ) : (
                 `Confirm (${reviewItems.filter((i) => i.selected).length})`
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Complete Delivery Confirmation Dialog */}
+      <Dialog
+        open={isCompleteDialogOpen}
+        onOpenChange={setIsCompleteDialogOpen}
+      >
+        <DialogContent className="max-w-md bg-white dark:bg-neutral-950">
+          <DialogHeader>
+            <DialogTitle>Complete Delivery?</DialogTitle>
+            <DialogDescription>
+              This will mark the session as archived and send delivery
+              confirmation emails to the client and admin.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setIsCompleteDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={confirmCompletion} disabled={completing}>
+              {completing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Finalizing...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  Yes, Complete Delivery
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manual Status Update Dialog */}
+      <Dialog open={isManualUpdateOpen} onOpenChange={setIsManualUpdateOpen}>
+        <DialogContent className="max-w-md bg-white dark:bg-neutral-950">
+          <DialogHeader>
+            <DialogTitle>Manual Status Update</DialogTitle>
+            <DialogDescription>
+              Update the status for <strong>{selectedArtwork?.title}</strong> (
+              {selectedArtwork?.wac_code}).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-6 space-y-4">
+            <div className="bg-neutral-50 dark:bg-neutral-900 p-4 rounded-lg border text-center">
+              <span className="text-xs font-bold text-neutral-400 uppercase tracking-widest block mb-1">
+                Current Status
+              </span>
+              <span
+                className={cn(
+                  "inline-flex items-center px-3 py-1 rounded-full text-sm font-bold",
+                  selectedArtwork?.status === "in_stock"
+                    ? "bg-blue-100 text-blue-800"
+                    : selectedArtwork?.status === "in_truck"
+                    ? "bg-orange-100 text-orange-800"
+                    : selectedArtwork?.status === "delivered"
+                    ? "bg-green-100 text-green-800"
+                    : "bg-neutral-100 text-neutral-800"
+                )}
+              >
+                {selectedArtwork ? formatStatus(selectedArtwork.status) : ""}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3">
+              {mode === "loading" && (
+                <>
+                  <Button
+                    variant={
+                      selectedArtwork?.status === "in_truck"
+                        ? "default"
+                        : "outline"
+                    }
+                    className={cn(
+                      "h-16 text-lg font-bold transition-all",
+                      selectedArtwork?.status === "in_truck" &&
+                        "bg-orange-600 hover:bg-orange-700"
+                    )}
+                    onClick={() => handleManualUpdate("in_truck")}
+                    disabled={
+                      manualUpdating || selectedArtwork?.status === "in_truck"
+                    }
+                  >
+                    <Truck className="w-6 h-6 mr-3" />
+                    Move to Truck
+                  </Button>
+                  <Button
+                    variant={
+                      selectedArtwork?.status === "in_stock"
+                        ? "default"
+                        : "outline"
+                    }
+                    className={cn(
+                      "h-16 text-lg font-bold transition-all",
+                      selectedArtwork?.status === "in_stock" &&
+                        "bg-blue-600 hover:bg-blue-700"
+                    )}
+                    onClick={() => handleManualUpdate("in_stock")}
+                    disabled={
+                      manualUpdating || selectedArtwork?.status === "in_stock"
+                    }
+                  >
+                    <Package className="w-6 h-6 mr-3" />
+                    Return to Stock
+                  </Button>
+                </>
+              )}
+
+              {mode === "delivering" && (
+                <>
+                  <Button
+                    variant={
+                      selectedArtwork?.status === "delivered"
+                        ? "default"
+                        : "outline"
+                    }
+                    className={cn(
+                      "h-16 text-lg font-bold transition-all",
+                      selectedArtwork?.status === "delivered" &&
+                        "bg-green-600 hover:bg-green-700"
+                    )}
+                    onClick={() => handleManualUpdate("delivered")}
+                    disabled={
+                      manualUpdating || selectedArtwork?.status === "delivered"
+                    }
+                  >
+                    <CheckCircle2 className="w-6 h-6 mr-3" />
+                    Mark as Delivered
+                  </Button>
+                  <Button
+                    variant={
+                      selectedArtwork?.status === "in_truck"
+                        ? "default"
+                        : "outline"
+                    }
+                    className={cn(
+                      "h-16 text-lg font-bold transition-all",
+                      selectedArtwork?.status === "in_truck" &&
+                        "bg-orange-600 hover:bg-orange-700"
+                    )}
+                    onClick={() => handleManualUpdate("in_truck")}
+                    disabled={
+                      manualUpdating || selectedArtwork?.status === "in_truck"
+                    }
+                  >
+                    <Truck className="w-6 h-6 mr-3" />
+                    Return to Truck
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setIsManualUpdateOpen(false)}
+              disabled={manualUpdating}
+            >
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
