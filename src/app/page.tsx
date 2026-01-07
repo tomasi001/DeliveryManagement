@@ -8,9 +8,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Shield, Truck, Settings, LogOut } from "lucide-react";
-import { signout } from "./login/actions";
+import { Shield, Truck, Settings } from "lucide-react";
 import { DataPrefetcher } from "@/components/data-prefetcher";
+import { SignOutButton } from "@/components/sign-out-button";
 
 export default async function Home() {
   const supabase = await createClient();
@@ -117,22 +117,16 @@ export default async function Home() {
             </Card>
           )}
 
-          <form action={signout} className="mt-4">
+          <div className="mt-4">
             <div className="flex items-center justify-center gap-2 mt-2">
               <span className="text-xs bg-neutral-200 dark:bg-neutral-800 px-2 py-1 rounded text-neutral-600 dark:text-neutral-400 font-medium">
                 {user.email}
               </span>
               <span>
-                <Button
-                  variant="ghost"
-                  className="w-full text-neutral-500 hover:text-red-500"
-                >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Sign Out
-                </Button>
+                <SignOutButton className="w-full text-neutral-500 hover:text-red-500" />
               </span>
             </div>
-          </form>
+          </div>
         </div>
 
         <div className="text-center text-xs text-neutral-400 mt-8">
