@@ -58,8 +58,8 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("upload");
 
   return (
-    <div className="min-h-screen bg-neutral-50/50 p-6 flex items-start justify-center pt-10">
-      <div className="w-full max-w-2xl space-y-6">
+    <div className="min-h-screen bg-neutral-50/50 p-4 md:p-8 flex items-start justify-center pt-10">
+      <div className="w-full max-w-5xl space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link href="/">

@@ -1,121 +1,170 @@
 # ArtTrack Delivery Management System
 
-A professional-grade delivery management system built with Next.js 15, Tailwind CSS v4, and Shadcn UI.
+A professional-grade delivery management system built for high-end art logistics.
 
-## 🔐 Role-Based Access Control (RBAC)
+**Tech Stack:**
 
-The system features three distinct roles with secure redirections and endpoint protection:
+- **Framework:** Next.js 15 (App Router)
+- **Styling:** Tailwind CSS v4 + Shadcn UI
+- **Database:** Supabase (PostgreSQL + Auth + RLS)
+- **AI/ML:** OpenAI Vision (`gpt-4o`) for document & artwork recognition
+- **Email:** Nodemailer (Custom SMTP)
+- **State/Feedback:** Sonner (Toasts), Server Actions
 
--   **Super Admin**: Full system control. Can add and remove internal users (Admins and Drivers).
-    -   *Special Note*: The email `tom.shields001@gmail.com` is automatically granted this role.
--   **Admin**: Manages delivery sessions. Can upload manifests, create sessions, and review reports.
--   **Driver**: Operates the delivery workflow. Can scan artworks and update statuses in real-time.
+---
 
-## 🚀 Key Features
+## 🏗️ Architecture & Key Decisions
 
--   **AI-Powered Manifest Extraction**: Upload any delivery PDF (text or scanned) and the system automatically identifies artwork details using AI Vision.
--   **Mobile Scanner**: Drivers use a high-performance camera scanner with AI OCR to identify artworks instantly.
--   **Manual Workarounds**: Tap any item in the manifest to manually override its status if scanning isn't possible.
--   **Automated Email Reports**: Confirmation emails are sent to clients and detailed reports to the warehouse admin upon completion.
+### 1. Pure AI Document Processing
 
-## 🛠️ Environment Variables
+**Decision:** We removed legacy regex/text-parsing libraries (`pdf-parse`) in favor of a pure AI approach.
+**Why:** Art manifests vary wildly in format. "Hard-coded" parsers are brittle. We convert PDFs to images and use OpenAI Vision to extract structured data (WAC Code, Artist, Title, Dimensions). This handles handwriting, complex layouts, and scans robustly.
 
-Required variables in `.env.local`:
+### 2. Supabase "Golden Standard" Workflow
+
+**Decision:** We strictly use the Supabase CLI for all schema changes. The Supabase Dashboard's SQL Editor is **forbidden** for schema edits to ensure our local `migrations` folder is always the source of truth.
+**Why:** Keeps development environments synced and enables safe, predictable production deployments.
+
+### 3. Role-Based Access Control (RBAC)
+
+**Decision:** Roles are stored in a `public.profiles` table linked to `auth.users`, not in JWT metadata.
+**Why:** Allows for easier real-time updates of user roles without requiring re-login. Protected via RLS policies.
+
+---
+
+## 🔐 Roles & Permissions
+
+| Role            | Access Level   | Description                                                                                                                       |
+| :-------------- | :------------- | :-------------------------------------------------------------------------------------------------------------------------------- |
+| **Super Admin** | 👑 Full System | Can manage users (Add/Edit/Delete), access Admin & Driver dashboards.                                                             |
+| **Admin**       | 🛡️ Managerial  | Can upload manifests, create sessions, edit artworks, view history, and finalize deliveries.                                      |
+| **Driver**      | 🚛 Operational | Mobile-optimized view. Can scan artworks (AI camera), update status (`In Truck` -> `Delivered`), and trigger delivery completion. |
+
+---
+
+## 🛠️ Database & Migrations SOP
+
+**⚠️ CRITICAL RULE:** NEVER manually edit a migration file in `supabase/migrations` after it has been applied.
+
+### 1. The Development Loop
+
+1.  **Start Local DB:**
+    ```bash
+    npx supabase start
+    ```
+2.  **Make Schema Changes:**
+    - _Option A (Preferred):_ Edit your schema via SQL commands in a new migration file.
+    - _Option B:_ Make changes in the local dashboard (`http://127.0.0.1:54323`), then run `npx supabase db diff -f name_of_change` to generate the migration file.
+3.  **Apply Migration Locally:**
+    ```bash
+    npx supabase migration up
+    ```
+4.  **Generate Types:**
+    ```bash
+    npm run supa:gen-types
+    ```
+    _This updates `src/types/supabase.ts` for full TypeScript safety._
+
+### 2. Deploying to Production
+
+Once tested locally:
+
+```bash
+npx supabase link --project-ref your-project-ref
+npx supabase db push
+```
+
+_This safely applies pending migrations to the remote database._
+
+### 3. The "Nuclear Reset" (Emergency Only)
+
+If your local schema gets hopelessly out of sync or corrupted:
+
+1.  Backup any critical data (seed data).
+2.  Run:
+    ```bash
+    npx supabase db reset
+    ```
+3.  This drops the local database and reapplies all migrations from scratch.
+
+---
+
+## 🚀 Environment Setup
+
+Create a `.env.local` file with the following keys:
 
 ```env
-# Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=your_publishable_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key # REQUIRED for Super Admin User Management
+# ------------------------------
+# SUPABASE (Found in Project Settings -> API)
+# ------------------------------
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=your-public-key
+# REQUIRED for Super Admin User Management (Bypasses RLS)
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-secret
 
-# Email Configuration (Nodemailer)
+# ------------------------------
+# EMAIL (Nodemailer)
+# ------------------------------
+# If using Gmail, use "smtp.gmail.com" and an App Password (NOT your login password)
 EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
-SENDER_EMAIL=your_email@example.com
-SENDER_PASSWORD=your_email_password
-ADMIN_EMAIL=admin@example.com
+SENDER_EMAIL=your-system-email@gmail.com
+SENDER_PASSWORD=your-app-password
+ADMIN_EMAIL=admin-receiver@example.com
 
-# OpenAI Configuration
-OPENAI_API_KEY=your_openai_key
+# ------------------------------
+# AI (OpenAI)
+# ------------------------------
+OPENAI_API_KEY=sk-proj-...
 ```
 
-## 🏗️ Getting Started
+---
 
-### 1. Install Dependencies
-```bash
-npm install
-```
+## 📱 Application Workflows
 
-### 2. Supabase Setup
-This project uses the Supabase CLI for migrations and type generation.
+### Admin: Creating a Session
 
-> **CRITICAL NOTE**: Never manually edit or create migration files in the `supabase/migrations` folder without using the CLI. All migration files must be **timestamped and managed by the CLI** to maintain database integrity between local and remote environments.
+1.  **Upload:** Drag & drop a delivery PDF.
+2.  **Processing:** AI converts pages to images, reads text, and extracts artwork details.
+3.  **Review:** Admin sees a "Checkpoint" table to verify/edit extracted data (WAC, Artist, Title).
+4.  **Finalize:** Session is created, status set to `Active`.
 
-#### One-Time Setup
-1. **Login to Supabase CLI**: `npx supabase login`
-2. **Link to Remote Project**: `npx supabase link --project-ref your-project-ref`
-   * *Note: You will need your Database Password.*
+### Driver: The Delivery Loop
 
-#### Local Development Workflow
-Use this workflow when adding new features or changing the database schema:
+1.  **Dashboard:** Sees active sessions.
+2.  **Loading Truck:**
+    - Scans item (camera) OR taps item in list.
+    - Status updates: `In Stock` -> `In Truck`.
+3.  **Delivering:**
+    - Scans item (camera) OR taps item in list.
+    - Status updates: `In Truck` -> `Delivered`.
+4.  **Complete:**
+    - Clicks "Complete Delivery".
+    - System generates email report -> Sends receipt to Client -> Sends manifest report to Admin.
+    - Session archived.
 
-1. **Create Migration File**: 
-   ```bash
-   npx supabase migration new <feature_name>
-   ```
-2. **Add SQL**: Paste your table definitions, RLS policies, and triggers into the newly created file in `supabase/migrations/`.
-3. **Apply Locally**: 
-   ```bash
-   npx supabase migration up
-   ```
-4. **Generate TypeScript Types**:
-   ```bash
-   npm run supa:gen-types
-   ```
+### Super Admin: User Management
 
-#### Production Deployment Workflow
-When your local changes are tested and ready for the live environment:
+1.  **Access:** `/super-admin` (only accessible to `super_admin` role).
+2.  **Create User:** Adds email/password + Role.
+    - _Behind the scenes:_ Creates auth user -> Trigger fires -> `public.profiles` entry created.
 
-1. **Push to Remote**:
-   ```bash
-   npx supabase db push
-   ```
-2. **Verify**: Check the Supabase Dashboard -> Table Editor to ensure tables and policies are present.
+---
 
-#### Initial Super Admin Creation
-Since the public signup flow is disabled, use the Supabase Admin API (via `curl`) to create your first Super Admin. Replace placeholders with your actual Project URL and `SUPABASE_SERVICE_ROLE_KEY`:
+## 🔧 Troubleshooting & Maintenance
 
-```bash
-curl -X POST 'https://[PROJECT_REF].supabase.co/auth/v1/admin/users' \
--H 'Authorization: Bearer [SERVICE_ROLE_KEY]' \
--H 'apikey: [SERVICE_ROLE_KEY]' \
--H 'Content-Type: application/json' \
--d '{
-  "email": "tom.shields001@gmail.com",
-  "password": "YOUR_SECURE_PASSWORD",
-  "email_confirm": true
-}'
-```
-*The database trigger `on_auth_user_created` will automatically assign the `super_admin` role to this specific email.*
+### Adding a New Feature
 
-#### Working Locally
-1.  **Start Local DB:** `npm run supa:start`
-2.  **Apply Migrations:** `npm run supa:migration up`
-3.  **Generate Types:** `npm run supa:gen-types`
+1.  **Schema:** Create migration via CLI.
+2.  **Types:** Run `npm run supa:gen-types`.
+3.  **UI:** Build Shadcn components.
+4.  **Logic:** Create Server Action in `src/app/actions/`.
+5.  **Security:** Add `checkRole([...])` to the start of the Server Action.
 
-#### Connecting to Live
-1.  **Link Project:** `npm run supa:link -- --project-ref your_ref`
-2.  **Push Schema:** `npm run supa:push`
+---
 
-### 3. Development
-```bash
-npm run dev
-```
+## 📜 Standard Operating Procedures (SOPs)
 
-## 📦 Deployment
-
-### Frontend (Vercel)
-Ensure all environment variables are added to your Vercel project settings.
-
-### Backend (Supabase)
-Ensure your `SUPABASE_SERVICE_ROLE_KEY` is kept secure and never exposed to the client.
+1.  **Code Style:** Run `npm run lint` before committing.
+2.  **Commit Messages:** Use conventional commits (e.g., `feat: add user modal`, `fix: rls policy`).
+3.  **Dependency Management:** Always check `package.json` for version conflicts (especially with Next.js 15 RC/Canary releases).

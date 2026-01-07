@@ -34,7 +34,7 @@ export default function RootLayout({
           "dark:bg-neutral-950"
         )}
       >
-        <div className="w-full max-w-md min-h-screen bg-background shadow-xl overflow-x-hidden relative">
+        <div className="w-full min-h-screen bg-background shadow-xl overflow-x-hidden relative">
           {children}
         </div>
         <Toaster richColors position="top-center" />

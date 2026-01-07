@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { addUser, removeUser, updateUserRole } from "./actions";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -46,11 +46,9 @@ import {
   User as UserIcon,
   ShieldCheck,
   Truck,
-  LogOut,
   Pencil,
   Plus,
 } from "lucide-react";
-import { signout } from "../login/actions";
 import Link from "next/link";
 import { Profile } from "@/types";
 import { cn } from "@/lib/utils";
@@ -59,7 +57,7 @@ import { toast } from "sonner";
 export default function SuperAdminDashboard() {
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Add User State
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
@@ -78,9 +76,10 @@ export default function SuperAdminDashboard() {
   const [deletingUser, setDeletingUser] = useState<Profile | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
-  async function fetchUsers() {
+  // Use a stable refresh function for manual triggers
+  const refreshUsers = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("profiles")
@@ -94,11 +93,32 @@ export default function SuperAdminDashboard() {
       setUsers(data || []);
     }
     setLoading(false);
-  }
+  }, [supabase]);
 
+  // Use a dedicated effect for initial load to avoid linter warnings about sync setState
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    let mounted = true;
+    const load = async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (mounted) {
+        if (error) {
+          console.error("Error fetching users:", error);
+          toast.error("Failed to fetch users", { description: error.message });
+        } else {
+          setUsers(data || []);
+        }
+        setLoading(false);
+      }
+    };
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [supabase]);
 
   async function handleAddUser(e: React.FormEvent) {
     e.preventDefault();
@@ -118,7 +138,7 @@ export default function SuperAdminDashboard() {
       setNewPassword("");
       setNewRole("driver");
       setIsAddOpen(false);
-      fetchUsers();
+      refreshUsers(); // Use refresh function here
     }
     setAddLoading(false);
   }
@@ -132,7 +152,7 @@ export default function SuperAdminDashboard() {
   async function handleUpdateUser(e: React.FormEvent) {
     e.preventDefault();
     if (!editingUser) return;
-    
+
     setEditLoading(true);
 
     const formData = new FormData();
@@ -146,7 +166,7 @@ export default function SuperAdminDashboard() {
       toast.success("User role updated successfully");
       setIsEditOpen(false);
       setEditingUser(null);
-      fetchUsers();
+      refreshUsers();
     }
     setEditLoading(false);
   }
@@ -158,7 +178,7 @@ export default function SuperAdminDashboard() {
 
   async function handleDeleteUser() {
     if (!deletingUser) return;
-    
+
     setDeleteLoading(true);
 
     const res = await removeUser(deletingUser.id);
@@ -168,14 +188,14 @@ export default function SuperAdminDashboard() {
       toast.success("User removed successfully");
       setIsDeleteOpen(false);
       setDeletingUser(null);
-      fetchUsers();
+      refreshUsers();
     }
     setDeleteLoading(false);
   }
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 p-6 pt-10">
-      <div className="max-w-5xl mx-auto space-y-8">
+      <div className="max-w-[1400px] mx-auto space-y-8 w-full">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -194,13 +214,17 @@ export default function SuperAdminDashboard() {
 
         {/* User Table Card */}
         <Card className="shadow-md border-neutral-200 dark:border-neutral-800">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 gap-4">
             <div>
               <CardTitle className="text-xl flex items-center gap-2">
                 <UserIcon className="w-5 h-5 text-neutral-500" />
-                System Users ({users.length})
+                <span className="hidden xs:inline">System Users</span>
+                <span className="xs:hidden">Users</span>
+                <span className="text-neutral-400 font-normal">
+                  ({users.length})
+                </span>
               </CardTitle>
-              <CardDescription className="mt-1">
+              <CardDescription className="mt-1 hidden sm:block">
                 Manage active users, assign roles, and control access.
               </CardDescription>
             </div>
@@ -208,9 +232,10 @@ export default function SuperAdminDashboard() {
             {/* Add User Dialog */}
             <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
               <DialogTrigger asChild>
-                <Button className="bg-brand-primary hover:bg-brand-primary/90 text-white gap-2">
+                <Button className="bg-brand-primary hover:bg-brand-primary/90 text-white gap-2 shrink-0">
                   <Plus className="w-4 h-4" />
-                  Add User
+                  <span className="hidden sm:inline">Add User</span>
+                  <span className="sm:hidden">Add</span>
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[425px] bg-white dark:bg-neutral-900">
@@ -289,86 +314,157 @@ export default function SuperAdminDashboard() {
                 <Loader2 className="w-8 h-8 animate-spin text-neutral-300" />
               </div>
             ) : (
-              <div className="border rounded-lg overflow-hidden">
-                <Table>
-                  <TableHeader className="bg-neutral-50 dark:bg-neutral-900">
-                    <TableRow>
-                      <TableHead>User Email</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {users.length === 0 ? (
+              <div className="border rounded-lg overflow-hidden bg-white dark:bg-neutral-900">
+                {/* Desktop View - Table (Visible on sm and larger) */}
+                <div className="hidden sm:block">
+                  <Table>
+                    <TableHeader className="bg-neutral-50 dark:bg-neutral-900">
                       <TableRow>
-                        <TableCell
-                          colSpan={3}
-                          className="text-center py-8 text-neutral-400"
-                        >
-                          No users found.
-                        </TableCell>
+                        <TableHead>User Email</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
-                    ) : (
-                      users.map((user) => (
-                        <TableRow key={user.id}>
-                          <TableCell className="font-medium">
-                            {user.email}
+                    </TableHeader>
+                    <TableBody>
+                      {users.length === 0 ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={3}
+                            className="text-center py-8 text-neutral-400"
+                          >
+                            No users found.
                           </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1.5">
-                              {user.role === "super_admin" && (
-                                <ShieldAlert className="w-3.5 h-3.5 text-brand-primary" />
-                              )}
-                              {user.role === "admin" && (
-                                <ShieldCheck className="w-3.5 h-3.5 text-blue-500" />
-                              )}
-                              {user.role === "driver" && (
-                                <Truck className="w-3.5 h-3.5 text-orange-500" />
-                              )}
-                              <span
-                                className={cn(
-                                  "text-xs font-bold uppercase tracking-wider",
-                                  user.role === "super_admin"
-                                    ? "text-brand-primary"
-                                    : user.role === "admin"
-                                    ? "text-blue-600"
-                                    : "text-orange-600"
+                        </TableRow>
+                      ) : (
+                        users.map((user) => (
+                          <TableRow key={user.id}>
+                            <TableCell className="font-medium">
+                              {user.email}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1.5">
+                                {user.role === "super_admin" && (
+                                  <ShieldAlert className="w-3.5 h-3.5 text-brand-primary" />
                                 )}
-                              >
-                                {user.role.replace("_", " ")}
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              {/* Edit Button */}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-neutral-500 hover:text-brand-primary hover:bg-brand-primary/5 transition-colors"
-                                onClick={() => openEditModal(user)}
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </Button>
-
-                              {/* Remove Button */}
-                              {user.role !== "super_admin" && (
+                                {user.role === "admin" && (
+                                  <ShieldCheck className="w-3.5 h-3.5 text-blue-500" />
+                                )}
+                                {user.role === "driver" && (
+                                  <Truck className="w-3.5 h-3.5 text-orange-500" />
+                                )}
+                                <span
+                                  className={cn(
+                                    "text-xs font-bold uppercase tracking-wider",
+                                    user.role === "super_admin"
+                                      ? "text-brand-primary"
+                                      : user.role === "admin"
+                                      ? "text-blue-600"
+                                      : "text-orange-600"
+                                  )}
+                                >
+                                  {user.role.replace("_", " ")}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                {/* Edit Button */}
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-8 w-8 text-neutral-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                                  onClick={() => openDeleteModal(user)}
+                                  className="h-8 w-8 text-neutral-500 hover:text-brand-primary hover:bg-brand-primary/5 transition-colors"
+                                  onClick={() => openEditModal(user)}
                                 >
-                                  <Trash2 className="w-4 h-4" />
+                                  <Pencil className="w-4 h-4" />
                                 </Button>
+
+                                {/* Remove Button */}
+                                {user.role !== "super_admin" && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-neutral-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                    onClick={() => openDeleteModal(user)}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Mobile View - Cards (Hidden on sm and larger) */}
+                <div className="sm:hidden divide-y divide-neutral-100 dark:divide-neutral-800">
+                  {users.length === 0 ? (
+                    <div className="text-center py-8 text-neutral-400">
+                      No users found.
+                    </div>
+                  ) : (
+                    users.map((user) => (
+                      <div
+                        key={user.id}
+                        className="p-4 flex items-center justify-between hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors"
+                      >
+                        <div className="space-y-1 min-w-0 flex-1">
+                          <div className="font-medium text-sm text-neutral-900 dark:text-neutral-100 truncate pr-2">
+                            {user.email}
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            {user.role === "super_admin" && (
+                              <ShieldAlert className="w-3 h-3 text-brand-primary" />
+                            )}
+                            {user.role === "admin" && (
+                              <ShieldCheck className="w-3 h-3 text-blue-500" />
+                            )}
+                            {user.role === "driver" && (
+                              <Truck className="w-3 h-3 text-orange-500" />
+                            )}
+                            <span
+                              className={cn(
+                                "text-[10px] font-bold uppercase tracking-wider",
+                                user.role === "super_admin"
+                                  ? "text-brand-primary"
+                                  : user.role === "admin"
+                                  ? "text-blue-600"
+                                  : "text-orange-600"
                               )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
+                            >
+                              {user.role.replace("_", " ")}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {/* Edit Button */}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-neutral-500 hover:bg-brand-primary/10 hover:text-brand-primary"
+                            onClick={() => openEditModal(user)}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+
+                          {/* Remove Button */}
+                          {user.role !== "super_admin" && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-neutral-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10"
+                              onClick={() => openDeleteModal(user)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             )}
           </CardContent>

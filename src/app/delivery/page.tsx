@@ -7,7 +7,15 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, Truck, CheckCircle2, Package, Calendar, ArrowLeft, LogOut } from "lucide-react";
+import {
+  ChevronRight,
+  Truck,
+  CheckCircle2,
+  Package,
+  Calendar,
+  ArrowLeft,
+  LogOut,
+} from "lucide-react";
 import { signout } from "../login/actions";
 import { Loader2 } from "lucide-react";
 import type { Session } from "@/types";
@@ -35,10 +43,8 @@ export default function DeliveryDashboard() {
   const activeSessions = sessions.filter(
     (s) => s.status === "ready_for_pickup"
   );
-  
-  const completedSessions = sessions.filter(
-    (s) => s.status === "archived"
-  );
+
+  const completedSessions = sessions.filter((s) => s.status === "archived");
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 p-6 pt-10">
@@ -69,18 +75,29 @@ export default function DeliveryDashboard() {
         ) : (
           <Tabs defaultValue="current" className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="current" className="flex items-center gap-2">
-                <Truck className="w-4 h-4" />
-                Current Deliveries
+              <TabsTrigger
+                value="current"
+                className="flex items-center justify-center gap-1.5 px-2"
+              >
+                <Truck className="w-4 h-4 shrink-0" />
+                <span className="truncate">
+                  <span className="hidden min-[430px]:inline">
+                    Current Deliveries
+                  </span>
+                  <span className="min-[430px]:hidden">Current</span>
+                </span>
                 {activeSessions.length > 0 && (
-                  <span className="ml-1 rounded-full bg-blue-600 text-white text-[10px] px-2 py-0.5">
+                  <span className="flex-shrink-0 rounded-full bg-blue-600 text-white text-[10px] px-1.5 py-0.5 min-w-[1.25rem] text-center">
                     {activeSessions.length}
                   </span>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="history" className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4" />
-                History
+              <TabsTrigger
+                value="history"
+                className="flex items-center justify-center gap-1.5 px-2"
+              >
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span className="truncate">History</span>
               </TabsTrigger>
             </TabsList>
 
@@ -88,12 +105,20 @@ export default function DeliveryDashboard() {
               {activeSessions.length === 0 ? (
                 <div className="text-center py-12 bg-white dark:bg-neutral-900 rounded-xl border border-dashed">
                   <Package className="w-12 h-12 mx-auto text-neutral-300 mb-3" />
-                  <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">No active deliveries</h3>
-                  <p className="text-sm text-neutral-500">Wait for admin to assign sessions.</p>
+                  <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">
+                    No active deliveries
+                  </h3>
+                  <p className="text-sm text-neutral-500">
+                    Wait for admin to assign sessions.
+                  </p>
                 </div>
               ) : (
                 activeSessions.map((session) => (
-                  <Link key={session.id} href={`/delivery/${session.id}`} className="block group">
+                  <Link
+                    key={session.id}
+                    href={`/delivery/${session.id}`}
+                    className="block group"
+                  >
                     <Card className="hover:border-blue-500/50 transition-colors cursor-pointer group-hover:shadow-md">
                       <CardContent className="p-5 flex items-center justify-between">
                         <div className="space-y-1">
@@ -101,15 +126,22 @@ export default function DeliveryDashboard() {
                             {session.client_name}
                           </h3>
                           <div className="flex items-center text-sm text-neutral-500">
-                            <span className="truncate max-w-[200px]">{session.address || 'No address'}</span>
+                            <span className="truncate max-w-[200px]">
+                              {session.address || "No address"}
+                            </span>
                           </div>
                           <div className="flex items-center gap-2 mt-2">
-                            <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300">
+                            <Badge
+                              variant="secondary"
+                              className="bg-blue-100 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300"
+                            >
                               Ready for Pickup
                             </Badge>
                             <span className="text-xs text-neutral-400 flex items-center gap-1">
-                                <Calendar className="w-3 h-3" />
-                                {new Date(session.created_at).toLocaleDateString()}
+                              <Calendar className="w-3 h-3" />
+                              {new Date(
+                                session.created_at
+                              ).toLocaleDateString()}
                             </span>
                           </div>
                         </div>
@@ -128,7 +160,11 @@ export default function DeliveryDashboard() {
                 </div>
               ) : (
                 completedSessions.map((session) => (
-                  <Link key={session.id} href={`/delivery/${session.id}`} className="block group">
+                  <Link
+                    key={session.id}
+                    href={`/delivery/${session.id}`}
+                    className="block group"
+                  >
                     <Card className="hover:bg-neutral-50 dark:hover:bg-neutral-900/50 transition-colors cursor-pointer border-neutral-200/60">
                       <CardContent className="p-4 flex items-center justify-between opacity-75 group-hover:opacity-100 transition-opacity">
                         <div className="space-y-1">
@@ -136,11 +172,15 @@ export default function DeliveryDashboard() {
                             {session.client_name}
                           </h3>
                           <p className="text-xs text-neutral-500 flex items-center gap-1">
-                            Completed on {new Date(session.created_at).toLocaleDateString()} 
+                            Completed on{" "}
+                            {new Date(session.created_at).toLocaleDateString()}
                             {/* Note: ideally we'd track 'completed_at', but created_at is fine for now */}
                           </p>
                         </div>
-                        <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50 dark:bg-green-900/20">
+                        <Badge
+                          variant="outline"
+                          className="text-green-600 border-green-200 bg-green-50 dark:bg-green-900/20"
+                        >
                           Completed
                         </Badge>
                       </CardContent>
