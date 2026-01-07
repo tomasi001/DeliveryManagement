@@ -39,4 +39,3 @@ export function DataPrefetcher({ role }: DataPrefetcherProps) {
 
   return null;
 }
-
