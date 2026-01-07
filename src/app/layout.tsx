@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
+import QueryProvider from "@/providers/query-provider";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 
@@ -34,10 +35,12 @@ export default function RootLayout({
           "dark:bg-neutral-950"
         )}
       >
-        <div className="w-full min-h-screen bg-background shadow-xl overflow-x-hidden relative">
-          {children}
-        </div>
-        <Toaster richColors position="top-center" />
+        <QueryProvider>
+          <div className="w-full min-h-screen bg-background shadow-xl overflow-x-hidden relative">
+            {children}
+          </div>
+          <Toaster richColors position="top-center" />
+        </QueryProvider>
       </body>
     </html>
   );

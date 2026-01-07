@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { updateArtworkStatus } from "@/app/actions/update-artwork";
-import { completeDelivery } from "@/app/actions/complete-delivery";
+import {
+  useUpdateArtworkStatus,
+  useCompleteDelivery,
+} from "@/hooks/use-session-mutations";
 import { CameraScanner } from "@/components/delivery/camera-scanner";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -53,9 +55,12 @@ function formatStatus(status: string) {
 }
 
 export function DeliveryView({ session, initialArtworks }: DeliveryViewProps) {
+  const completeDeliveryMutation = useCompleteDelivery();
+  const updateArtworkStatusMutation = useUpdateArtworkStatus();
+
   const [artworks, setArtworks] = useState(initialArtworks);
   const [mode, setMode] = useState<"loading" | "delivering">("loading");
-  const [completing, setCompleting] = useState(false);
+  // removed completing state, using mutation state
   const isArchived = session.status === "archived";
 
   // Review State
@@ -69,7 +74,7 @@ export function DeliveryView({ session, initialArtworks }: DeliveryViewProps) {
   // Manual Status Update State
   const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null);
   const [isManualUpdateOpen, setIsManualUpdateOpen] = useState(false);
-  const [manualUpdating, setManualUpdating] = useState(false);
+  // removed manualUpdating state, using mutation state
 
   const handleScan = (items: AIScannedArtwork[]) => {
     // If archived, do nothing (scanning disabled)
@@ -132,7 +137,11 @@ export function DeliveryView({ session, initialArtworks }: DeliveryViewProps) {
               a.id === item.match!.id ? { ...a, status: targetStatus } : a
             )
           );
-          await updateArtworkStatus(item.match.id, targetStatus, session.id);
+          await updateArtworkStatusMutation.mutateAsync({
+            artworkId: item.match.id,
+            status: targetStatus,
+            sessionId: session.id,
+          });
         }
       })
     );
@@ -148,25 +157,25 @@ export function DeliveryView({ session, initialArtworks }: DeliveryViewProps) {
 
   // Triggered by dialog confirm
   async function confirmCompletion() {
-    setCompleting(true);
-    const res = await completeDelivery(session.id);
-    if (res.success) {
-      toast.success("Delivery completed successfully");
-      // Reload page to reflect archived status
-      window.location.reload();
-    } else {
+    try {
+      const res = await completeDeliveryMutation.mutateAsync(session.id);
+      if (res.success) {
+        toast.success("Delivery completed successfully");
+        // Reload page to reflect archived status
+        window.location.reload();
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
       toast.error("Failed to complete delivery", {
-        description: res.error || "Unknown error",
+        description: message,
       });
       setIsCompleteDialogOpen(false);
     }
-    setCompleting(false);
   }
 
   const handleManualUpdate = async (targetStatus: ArtworkStatus) => {
     if (!selectedArtwork) return;
 
-    setManualUpdating(true);
     try {
       // Optimistic update
       setArtworks((prev) =>
@@ -174,15 +183,17 @@ export function DeliveryView({ session, initialArtworks }: DeliveryViewProps) {
           a.id === selectedArtwork.id ? { ...a, status: targetStatus } : a
         )
       );
-      await updateArtworkStatus(selectedArtwork.id, targetStatus, session.id);
+      await updateArtworkStatusMutation.mutateAsync({
+        artworkId: selectedArtwork.id,
+        status: targetStatus,
+        sessionId: session.id,
+      });
       toast.success(`Status updated to ${formatStatus(targetStatus)}`);
       setIsManualUpdateOpen(false);
       setSelectedArtwork(null);
     } catch (err) {
       console.error("Manual update error:", err);
       toast.error("Failed to update status");
-    } finally {
-      setManualUpdating(false);
     }
   };
 
@@ -227,7 +238,7 @@ export function DeliveryView({ session, initialArtworks }: DeliveryViewProps) {
         </label>
         <Tabs
           value={mode}
-          onValueChange={(v) => setMode(v as any)}
+          onValueChange={(v) => setMode(v as "loading" | "delivering")}
           className="w-full"
         >
           <TabsList className="grid w-full grid-cols-2 h-12 bg-neutral-100 dark:bg-neutral-800 rounded-xl p-1">
@@ -331,11 +342,11 @@ export function DeliveryView({ session, initialArtworks }: DeliveryViewProps) {
         <div className="pt-4 px-1">
           <Button
             onClick={handleComplete}
-            disabled={completing}
+            disabled={completeDeliveryMutation.isPending}
             size="lg"
             className="w-full h-14 text-lg font-bold bg-neutral-900 dark:bg-neutral-50 text-white dark:text-neutral-900 rounded-xl shadow-lg hover:opacity-90 transition-all active:scale-[0.98]"
           >
-            {completing ? (
+            {completeDeliveryMutation.isPending ? (
               <>
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                 Finalizing...
@@ -523,7 +534,8 @@ export function DeliveryView({ session, initialArtworks }: DeliveryViewProps) {
                     )}
                     onClick={() => handleManualUpdate("in_truck")}
                     disabled={
-                      manualUpdating || selectedArtwork?.status === "in_truck"
+                      updateArtworkStatusMutation.isPending ||
+                      selectedArtwork?.status === "in_truck"
                     }
                   >
                     <Truck className="w-6 h-6 mr-3" />
@@ -542,7 +554,8 @@ export function DeliveryView({ session, initialArtworks }: DeliveryViewProps) {
                     )}
                     onClick={() => handleManualUpdate("in_stock")}
                     disabled={
-                      manualUpdating || selectedArtwork?.status === "in_stock"
+                      updateArtworkStatusMutation.isPending ||
+                      selectedArtwork?.status === "in_stock"
                     }
                   >
                     <Package className="w-6 h-6 mr-3" />
@@ -566,7 +579,8 @@ export function DeliveryView({ session, initialArtworks }: DeliveryViewProps) {
                     )}
                     onClick={() => handleManualUpdate("delivered")}
                     disabled={
-                      manualUpdating || selectedArtwork?.status === "delivered"
+                      updateArtworkStatusMutation.isPending ||
+                      selectedArtwork?.status === "delivered"
                     }
                   >
                     <CheckCircle2 className="w-6 h-6 mr-3" />
@@ -585,7 +599,8 @@ export function DeliveryView({ session, initialArtworks }: DeliveryViewProps) {
                     )}
                     onClick={() => handleManualUpdate("in_truck")}
                     disabled={
-                      manualUpdating || selectedArtwork?.status === "in_truck"
+                      updateArtworkStatusMutation.isPending ||
+                      selectedArtwork?.status === "in_truck"
                     }
                   >
                     <Truck className="w-6 h-6 mr-3" />
@@ -600,7 +615,7 @@ export function DeliveryView({ session, initialArtworks }: DeliveryViewProps) {
             <Button
               variant="ghost"
               onClick={() => setIsManualUpdateOpen(false)}
-              disabled={manualUpdating}
+              disabled={updateArtworkStatusMutation.isPending}
             >
               Close
             </Button>

@@ -1,8 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { addUser, removeUser, updateUserRole } from "./actions";
-import { createClient } from "@/lib/supabase/client";
+import { useState } from "react";
+import { useUsers } from "@/hooks/use-users";
+import {
+  useAddUser,
+  useUpdateUserRole,
+  useRemoveUser,
+} from "@/hooks/use-user-mutations";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -55,12 +59,14 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 export default function SuperAdminDashboard() {
-  const [users, setUsers] = useState<Profile[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: users = [], isLoading: loading, error } = useUsers();
+
+  const addUserMutation = useAddUser();
+  const updateUserRoleMutation = useUpdateUserRole();
+  const removeUserMutation = useRemoveUser();
 
   // Add User State
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [addLoading, setAddLoading] = useState(false);
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newRole, setNewRole] = useState("driver");
@@ -68,79 +74,34 @@ export default function SuperAdminDashboard() {
   // Edit User State
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<Profile | null>(null);
-  const [editLoading, setEditLoading] = useState(false);
   const [editRole, setEditRole] = useState("driver");
 
   // Delete User State
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deletingUser, setDeletingUser] = useState<Profile | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
 
-  const supabase = useMemo(() => createClient(), []);
-
-  // Use a stable refresh function for manual triggers
-  const refreshUsers = useCallback(async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("Error fetching users:", error);
-      toast.error("Failed to fetch users", { description: error.message });
-    } else {
-      setUsers(data || []);
-    }
-    setLoading(false);
-  }, [supabase]);
-
-  // Use a dedicated effect for initial load to avoid linter warnings about sync setState
-  useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (mounted) {
-        if (error) {
-          console.error("Error fetching users:", error);
-          toast.error("Failed to fetch users", { description: error.message });
-        } else {
-          setUsers(data || []);
-        }
-        setLoading(false);
-      }
-    };
-    load();
-    return () => {
-      mounted = false;
-    };
-  }, [supabase]);
+  if (error) {
+    toast.error("Failed to fetch users", { description: error.message });
+  }
 
   async function handleAddUser(e: React.FormEvent) {
     e.preventDefault();
-    setAddLoading(true);
 
     const formData = new FormData();
     formData.append("email", newEmail);
     formData.append("password", newPassword);
     formData.append("role", newRole);
 
-    const res = await addUser(formData);
-    if (res.error) {
-      toast.error("Failed to create user", { description: res.error });
-    } else {
+    try {
+      await addUserMutation.mutateAsync(formData);
       toast.success("User created successfully");
       setNewEmail("");
       setNewPassword("");
       setNewRole("driver");
       setIsAddOpen(false);
-      refreshUsers(); // Use refresh function here
+    } catch (err: any) {
+      toast.error("Failed to create user", { description: err.message });
     }
-    setAddLoading(false);
   }
 
   function openEditModal(user: Profile) {
@@ -153,22 +114,18 @@ export default function SuperAdminDashboard() {
     e.preventDefault();
     if (!editingUser) return;
 
-    setEditLoading(true);
-
     const formData = new FormData();
     formData.append("userId", editingUser.id);
     formData.append("role", editRole);
 
-    const res = await updateUserRole(formData);
-    if (res.error) {
-      toast.error("Failed to update user role", { description: res.error });
-    } else {
+    try {
+      await updateUserRoleMutation.mutateAsync(formData);
       toast.success("User role updated successfully");
       setIsEditOpen(false);
       setEditingUser(null);
-      refreshUsers();
+    } catch (err: any) {
+      toast.error("Failed to update user role", { description: err.message });
     }
-    setEditLoading(false);
   }
 
   function openDeleteModal(user: Profile) {
@@ -179,18 +136,14 @@ export default function SuperAdminDashboard() {
   async function handleDeleteUser() {
     if (!deletingUser) return;
 
-    setDeleteLoading(true);
-
-    const res = await removeUser(deletingUser.id);
-    if (res.error) {
-      toast.error("Failed to remove user", { description: res.error });
-    } else {
+    try {
+      await removeUserMutation.mutateAsync(deletingUser.id);
       toast.success("User removed successfully");
       setIsDeleteOpen(false);
       setDeletingUser(null);
-      refreshUsers();
+    } catch (err: any) {
+      toast.error("Failed to remove user", { description: err.message });
     }
-    setDeleteLoading(false);
   }
 
   return (
@@ -293,9 +246,9 @@ export default function SuperAdminDashboard() {
                     <Button
                       type="submit"
                       className="bg-brand-primary hover:bg-brand-primary/90"
-                      disabled={addLoading}
+                      disabled={addUserMutation.isPending}
                     >
-                      {addLoading ? (
+                      {addUserMutation.isPending ? (
                         <Loader2 className="w-4 h-4 animate-spin mr-2" />
                       ) : (
                         <UserPlus className="w-4 h-4 mr-2" />
@@ -513,9 +466,9 @@ export default function SuperAdminDashboard() {
               <Button
                 type="submit"
                 className="bg-brand-primary hover:bg-brand-primary/90"
-                disabled={editLoading}
+                disabled={updateUserRoleMutation.isPending}
               >
-                {editLoading ? (
+                {updateUserRoleMutation.isPending ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
                 ) : (
                   <ShieldCheck className="w-4 h-4 mr-2" />
@@ -555,9 +508,9 @@ export default function SuperAdminDashboard() {
               variant="destructive"
               className="bg-red-600 hover:bg-red-700"
               onClick={handleDeleteUser}
-              disabled={deleteLoading}
+              disabled={removeUserMutation.isPending}
             >
-              {deleteLoading ? (
+              {removeUserMutation.isPending ? (
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
               ) : (
                 <Trash2 className="w-4 h-4 mr-2" />

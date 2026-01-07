@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { getSessions } from "@/app/actions/get-sessions";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { useSessions } from "@/hooks/use-sessions";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,23 +22,11 @@ import type { Session } from "@/types";
 import { toast } from "sonner";
 
 export default function DeliveryDashboard() {
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: sessions = [], isLoading: loading, error } = useSessions();
 
-  useEffect(() => {
-    async function loadSessions() {
-      try {
-        const data = await getSessions();
-        setSessions(data);
-      } catch (e) {
-        console.error("Failed to load sessions", e);
-        toast.error("Failed to load deliveries");
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadSessions();
-  }, []);
+  if (error) {
+    toast.error("Failed to load deliveries");
+  }
 
   const activeSessions = sessions.filter(
     (s) => s.status === "ready_for_pickup"

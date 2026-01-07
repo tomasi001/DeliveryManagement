@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { extractWacFromImage } from "@/app/actions/extract-wac";
-import { createSessionWithArtworks } from "@/app/actions/create-session";
-import { getSessions } from "@/app/actions/get-sessions";
+import { useSessions } from "@/hooks/use-sessions";
+import { useCreateSession } from "@/hooks/use-session-mutations";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -107,6 +107,7 @@ export default function AdminDashboard() {
 }
 
 function UploadManifestView() {
+  const createSessionMutation = useCreateSession();
   const [loading, setLoading] = useState(false);
   const [statusText, setStatusText] = useState("Processing Manifest...");
   const [error, setError] = useState<string | null>(null);
@@ -117,7 +118,7 @@ function UploadManifestView() {
   const [extractedArtworks, setExtractedArtworks] = useState<ScannedArtwork[]>(
     []
   );
-  const [creatingSession, setCreatingSession] = useState(false);
+  // removed creatingSession state, using mutation state
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<ScannedArtwork | null>(null);
 
@@ -261,20 +262,20 @@ function UploadManifestView() {
       return;
     }
 
-    setCreatingSession(true);
-    const result = await createSessionWithArtworks(
-      extractedArtworks,
-      clientDetails
-    );
-
-    if (result.success && result.sessionId) {
-      toast.success("Session created successfully");
-      router.push(`/admin/session/${result.sessionId}`);
-    } else {
-      toast.error("Failed to create session", {
-        description: result.error,
+    try {
+      const result = await createSessionMutation.mutateAsync({
+        artworks: extractedArtworks,
+        clientDetails,
       });
-      setCreatingSession(false);
+
+      if (result.success && result.sessionId) {
+        toast.success("Session created successfully");
+        router.push(`/admin/session/${result.sessionId}`);
+      }
+    } catch (err: any) {
+      toast.error("Failed to create session", {
+        description: err.message,
+      });
     }
   }
 
@@ -588,12 +589,12 @@ function UploadManifestView() {
               onClick={confirmSessionCreation}
               disabled={
                 extractedArtworks.length === 0 ||
-                creatingSession ||
+                createSessionMutation.isPending ||
                 !clientDetails.name ||
                 !clientDetails.email
               }
             >
-              {creatingSession ? (
+              {createSessionMutation.isPending ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Creating...
@@ -613,23 +614,11 @@ function UploadManifestView() {
 }
 
 function HistoryView() {
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: sessions = [], isLoading: loading, error } = useSessions();
 
-  useEffect(() => {
-    async function loadSessions() {
-      try {
-        const data = await getSessions();
-        setSessions(data);
-      } catch (e) {
-        console.error("Failed to load history", e);
-        toast.error("Failed to load session history");
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadSessions();
-  }, []);
+  if (error) {
+    toast.error("Failed to load session history");
+  }
 
   if (loading) {
     return (

@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Shield, Truck, Settings, LogOut } from "lucide-react";
 import { signout } from "./login/actions";
+import { DataPrefetcher } from "@/components/data-prefetcher";
 
 export default async function Home() {
   const supabase = await createClient();
@@ -35,6 +36,7 @@ export default async function Home() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-6 space-y-8 bg-neutral-50 dark:bg-neutral-950">
+      <DataPrefetcher role={profile.role} />
       <div className="w-full max-w-md space-y-8">
         <div className="text-center space-y-2">
           <h1 className="text-4xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
