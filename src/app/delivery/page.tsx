@@ -11,6 +11,7 @@ import { ChevronRight, Truck, CheckCircle2, Package, Calendar, ArrowLeft, LogOut
 import { signout } from "../login/actions";
 import { Loader2 } from "lucide-react";
 import type { Session } from "@/types";
+import { toast } from "sonner";
 
 export default function DeliveryDashboard() {
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -23,6 +24,7 @@ export default function DeliveryDashboard() {
         setSessions(data);
       } catch (e) {
         console.error("Failed to load sessions", e);
+        toast.error("Failed to load deliveries");
       } finally {
         setLoading(false);
       }

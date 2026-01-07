@@ -42,14 +42,6 @@ export default async function Home() {
         <p className="text-neutral-500 dark:text-neutral-400">
           Delivery Management System
         </p>
-        <div className="flex items-center justify-center gap-2 mt-2">
-          <span className="text-xs bg-neutral-200 dark:bg-neutral-800 px-2 py-1 rounded text-neutral-600 dark:text-neutral-400 font-medium">
-            {user.email}
-          </span>
-          <span className="text-xs bg-brand-primary/10 px-2 py-1 rounded text-brand-primary font-bold uppercase tracking-wider">
-            {profile?.role?.replace("_", " ")}
-          </span>
-        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 w-full max-w-md">
@@ -122,13 +114,20 @@ export default async function Home() {
         )}
 
         <form action={signout} className="mt-4">
-          <Button
-            variant="ghost"
-            className="w-full text-neutral-500 hover:text-red-500"
-          >
-            <LogOut className="h-4 w-4 mr-2" />
-            Sign Out
-          </Button>
+          <div className="flex items-center justify-center gap-2 mt-2">
+            <span className="text-xs bg-neutral-200 dark:bg-neutral-800 px-2 py-1 rounded text-neutral-600 dark:text-neutral-400 font-medium">
+              {user.email}
+            </span>
+            <span>
+              <Button
+                variant="ghost"
+                className="w-full text-neutral-500 hover:text-red-500"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
+              </Button>
+            </span>
+          </div>
         </form>
       </div>
 

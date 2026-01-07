@@ -40,12 +40,12 @@ import {
   ArrowLeft,
   Pencil,
   Check,
-  LogOut,
 } from "lucide-react";
 import { signout } from "../login/actions";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import type { Session } from "@/types";
+import { toast } from "sonner";
 
 interface ScannedArtwork {
   wacCode: string;
@@ -133,7 +133,9 @@ function UploadManifestView() {
 
   async function handleFiles(file: File) {
     if (file.type !== "application/pdf") {
-      setError("Please upload a PDF file.");
+      toast.error("Invalid file type", {
+        description: "Please upload a PDF file.",
+      });
       return;
     }
 
@@ -145,7 +147,9 @@ function UploadManifestView() {
       await processPdfWithAi(file);
     } catch (err) {
       console.error("Upload error:", err);
-      setError("An unexpected error occurred");
+      toast.error("Upload failed", {
+        description: "An unexpected error occurred while processing the file.",
+      });
       setLoading(false);
     }
   }
@@ -202,12 +206,16 @@ function UploadManifestView() {
         );
         openReview(uniqueArtworks);
       } else {
-        setError("AI could not find any artwork details in the document.");
+        const msg = "AI could not find any artwork details in the document.";
+        setError(msg);
+        toast.warning("No artworks found", { description: msg });
         setLoading(false);
       }
     } catch (err) {
       console.error("AI Processing Error:", err);
-      setError("Failed to process document with AI.");
+      const msg = "Failed to process document with AI.";
+      setError(msg);
+      toast.error("Processing failed", { description: msg });
       setLoading(false);
     }
   }
@@ -247,7 +255,9 @@ function UploadManifestView() {
   async function confirmSessionCreation() {
     if (extractedArtworks.length === 0) return;
     if (!clientDetails.name || !clientDetails.email) {
-      alert("Please provide client name and email.");
+      toast.warning("Missing details", {
+        description: "Please provide client name and email.",
+      });
       return;
     }
 
@@ -258,9 +268,12 @@ function UploadManifestView() {
     );
 
     if (result.success && result.sessionId) {
+      toast.success("Session created successfully");
       router.push(`/admin/session/${result.sessionId}`);
     } else {
-      alert("Failed to create session: " + result.error);
+      toast.error("Failed to create session", {
+        description: result.error,
+      });
       setCreatingSession(false);
     }
   }
@@ -610,6 +623,7 @@ function HistoryView() {
         setSessions(data);
       } catch (e) {
         console.error("Failed to load history", e);
+        toast.error("Failed to load session history");
       } finally {
         setLoading(false);
       }

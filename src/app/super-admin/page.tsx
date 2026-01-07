@@ -54,15 +54,15 @@ import { signout } from "../login/actions";
 import Link from "next/link";
 import { Profile } from "@/types";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export default function SuperAdminDashboard() {
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
-
+  
   // Add User State
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
-  const [addError, setAddError] = useState<string | null>(null);
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newRole, setNewRole] = useState("driver");
@@ -71,14 +71,12 @@ export default function SuperAdminDashboard() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<Profile | null>(null);
   const [editLoading, setEditLoading] = useState(false);
-  const [editError, setEditError] = useState<string | null>(null);
   const [editRole, setEditRole] = useState("driver");
 
   // Delete User State
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deletingUser, setDeletingUser] = useState<Profile | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const supabase = createClient();
 
@@ -91,6 +89,7 @@ export default function SuperAdminDashboard() {
 
     if (error) {
       console.error("Error fetching users:", error);
+      toast.error("Failed to fetch users", { description: error.message });
     } else {
       setUsers(data || []);
     }
@@ -104,7 +103,6 @@ export default function SuperAdminDashboard() {
   async function handleAddUser(e: React.FormEvent) {
     e.preventDefault();
     setAddLoading(true);
-    setAddError(null);
 
     const formData = new FormData();
     formData.append("email", newEmail);
@@ -113,8 +111,9 @@ export default function SuperAdminDashboard() {
 
     const res = await addUser(formData);
     if (res.error) {
-      setAddError(res.error);
+      toast.error("Failed to create user", { description: res.error });
     } else {
+      toast.success("User created successfully");
       setNewEmail("");
       setNewPassword("");
       setNewRole("driver");
@@ -127,16 +126,14 @@ export default function SuperAdminDashboard() {
   function openEditModal(user: Profile) {
     setEditingUser(user);
     setEditRole(user.role);
-    setEditError(null);
     setIsEditOpen(true);
   }
 
   async function handleUpdateUser(e: React.FormEvent) {
     e.preventDefault();
     if (!editingUser) return;
-
+    
     setEditLoading(true);
-    setEditError(null);
 
     const formData = new FormData();
     formData.append("userId", editingUser.id);
@@ -144,8 +141,9 @@ export default function SuperAdminDashboard() {
 
     const res = await updateUserRole(formData);
     if (res.error) {
-      setEditError(res.error);
+      toast.error("Failed to update user role", { description: res.error });
     } else {
+      toast.success("User role updated successfully");
       setIsEditOpen(false);
       setEditingUser(null);
       fetchUsers();
@@ -155,20 +153,19 @@ export default function SuperAdminDashboard() {
 
   function openDeleteModal(user: Profile) {
     setDeletingUser(user);
-    setDeleteError(null);
     setIsDeleteOpen(true);
   }
 
   async function handleDeleteUser() {
     if (!deletingUser) return;
-
+    
     setDeleteLoading(true);
-    setDeleteError(null);
 
     const res = await removeUser(deletingUser.id);
     if (res.error) {
-      setDeleteError(res.error);
+      toast.error("Failed to remove user", { description: res.error });
     } else {
+      toast.success("User removed successfully");
       setIsDeleteOpen(false);
       setDeletingUser(null);
       fetchUsers();
@@ -260,11 +257,6 @@ export default function SuperAdminDashboard() {
                       </SelectContent>
                     </Select>
                   </div>
-                  {addError && (
-                    <p className="text-xs text-red-500 bg-red-50 p-2 rounded">
-                      {addError}
-                    </p>
-                  )}
                   <DialogFooter className="pt-4">
                     <Button
                       type="button"
@@ -414,11 +406,6 @@ export default function SuperAdminDashboard() {
                 </SelectContent>
               </Select>
             </div>
-            {editError && (
-              <p className="text-xs text-red-500 bg-red-50 p-2 rounded">
-                {editError}
-              </p>
-            )}
             <DialogFooter className="pt-4">
               <Button
                 type="button"
@@ -458,12 +445,6 @@ export default function SuperAdminDashboard() {
               undone and will permanently remove their access to the system.
             </DialogDescription>
           </DialogHeader>
-
-          {deleteError && (
-            <p className="text-xs text-red-500 bg-red-50 p-2 rounded mt-2">
-              {deleteError}
-            </p>
-          )}
 
           <DialogFooter className="pt-4 gap-2 sm:gap-0">
             <Button

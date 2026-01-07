@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { toast } from "sonner";
 
 interface DeliveryViewProps {
   session: Session;
@@ -150,10 +151,13 @@ export function DeliveryView({ session, initialArtworks }: DeliveryViewProps) {
     setCompleting(true);
     const res = await completeDelivery(session.id);
     if (res.success) {
+      toast.success("Delivery completed successfully");
       // Reload page to reflect archived status
       window.location.reload();
     } else {
-      alert("Error completing delivery: " + (res.error || "Unknown error"));
+      toast.error("Failed to complete delivery", {
+        description: res.error || "Unknown error",
+      });
       setIsCompleteDialogOpen(false);
     }
     setCompleting(false);
@@ -171,11 +175,12 @@ export function DeliveryView({ session, initialArtworks }: DeliveryViewProps) {
         )
       );
       await updateArtworkStatus(selectedArtwork.id, targetStatus, session.id);
+      toast.success(`Status updated to ${formatStatus(targetStatus)}`);
       setIsManualUpdateOpen(false);
       setSelectedArtwork(null);
     } catch (err) {
       console.error("Manual update error:", err);
-      alert("Failed to update status.");
+      toast.error("Failed to update status");
     } finally {
       setManualUpdating(false);
     }
