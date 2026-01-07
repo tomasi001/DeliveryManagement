@@ -13,18 +13,15 @@ import {
   CardTitle,
   CardFooter,
 } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
   async function handleLogin(formData: FormData) {
     setLoading(true);
     setError(null);
-    setSuccess(null);
 
     const res = await login(formData);
     if (res?.error) {

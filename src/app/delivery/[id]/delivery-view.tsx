@@ -469,8 +469,11 @@ export function DeliveryView({ session, initialArtworks }: DeliveryViewProps) {
             >
               Cancel
             </Button>
-            <Button onClick={confirmCompletion} disabled={completing}>
-              {completing ? (
+            <Button
+              onClick={confirmCompletion}
+              disabled={completeDeliveryMutation.isPending}
+            >
+              {completeDeliveryMutation.isPending ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Finalizing...

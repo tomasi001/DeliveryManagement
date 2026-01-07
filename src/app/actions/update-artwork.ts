@@ -18,8 +18,9 @@ export async function updateArtworkStatus(artworkId: string, status: ArtworkStat
   
   revalidatePath(`/delivery/${sessionId}`)
   return { success: true }
-  } catch (error: any) {
-    return { error: error.message }
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return { error: message }
   }
 }
 

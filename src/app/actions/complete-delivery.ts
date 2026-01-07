@@ -68,8 +68,9 @@ export async function completeDelivery(sessionId: string) {
       .eq("id", sessionId);
 
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Email/Auth error:", error);
-    return { error: error.message || "Failed to send emails" };
+    const message = error instanceof Error ? error.message : "Failed to send emails";
+    return { error: message };
   }
 }

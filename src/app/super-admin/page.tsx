@@ -99,8 +99,9 @@ export default function SuperAdminDashboard() {
       setNewPassword("");
       setNewRole("driver");
       setIsAddOpen(false);
-    } catch (err: any) {
-      toast.error("Failed to create user", { description: err.message });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      toast.error("Failed to create user", { description: message });
     }
   }
 
@@ -123,8 +124,9 @@ export default function SuperAdminDashboard() {
       toast.success("User role updated successfully");
       setIsEditOpen(false);
       setEditingUser(null);
-    } catch (err: any) {
-      toast.error("Failed to update user role", { description: err.message });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      toast.error("Failed to update user role", { description: message });
     }
   }
 
@@ -141,8 +143,9 @@ export default function SuperAdminDashboard() {
       toast.success("User removed successfully");
       setIsDeleteOpen(false);
       setDeletingUser(null);
-    } catch (err: any) {
-      toast.error("Failed to remove user", { description: err.message });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      toast.error("Failed to remove user", { description: message });
     }
   }
 

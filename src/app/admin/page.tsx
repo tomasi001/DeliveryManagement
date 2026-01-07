@@ -41,10 +41,8 @@ import {
   Pencil,
   Check,
 } from "lucide-react";
-import { signout } from "../login/actions";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import type { Session } from "@/types";
 import { toast } from "sonner";
 
 interface ScannedArtwork {
@@ -180,7 +178,7 @@ function UploadManifestView() {
           await page.render({
             canvasContext: context,
             viewport,
-            canvas: canvas as any,
+            canvas: canvas as unknown as HTMLCanvasElement,
           }).promise;
           const base64Image = canvas.toDataURL("image/jpeg", 0.8);
 
@@ -188,7 +186,7 @@ function UploadManifestView() {
 
           if (aiResult.success && aiResult.data) {
             allArtworks.push(
-              ...(aiResult.data as any[]).map((item) => ({
+              ...(aiResult.data as ScannedArtwork[]).map((item) => ({
                 wacCode: item.wacCode,
                 artist: item.artist || undefined,
                 title: item.title || undefined,
@@ -272,9 +270,10 @@ function UploadManifestView() {
         toast.success("Session created successfully");
         router.push(`/admin/session/${result.sessionId}`);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unknown error";
       toast.error("Failed to create session", {
-        description: err.message,
+        description: message,
       });
     }
   }

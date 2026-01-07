@@ -20,7 +20,7 @@ export function Scanner({ onScan }: ScannerProps) {
 
     scanner.render((decodedText) => {
        onScan(decodedText)
-    }, (error) => {
+    }, () => {
        // ignore errors to avoid console spam
     });
 

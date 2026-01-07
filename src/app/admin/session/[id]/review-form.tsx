@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { finalizeSession } from '@/app/actions/finalize-session'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Check, Truck, ExternalLink } from 'lucide-react'
+import { Truck, ExternalLink } from 'lucide-react'
 import type { Session, Artwork } from '@/types'
 
 interface ReviewFormProps {

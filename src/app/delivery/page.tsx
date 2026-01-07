@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
 import { useSessions } from "@/hooks/use-sessions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,11 +12,9 @@ import {
   Package,
   Calendar,
   ArrowLeft,
-  LogOut,
 } from "lucide-react";
-import { signout } from "../login/actions";
+import Link from "next/link";
 import { Loader2 } from "lucide-react";
-import type { Session } from "@/types";
 import { toast } from "sonner";
 
 export default function DeliveryDashboard() {

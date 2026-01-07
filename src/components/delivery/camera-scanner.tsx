@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { extractWacFromImage } from "@/app/actions/extract-wac";
-import { Loader2, Camera, Upload, AlertCircle } from "lucide-react";
+import { Loader2, Camera, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AIScannedArtwork } from "@/types";
 
