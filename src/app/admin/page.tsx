@@ -40,7 +40,9 @@ import {
   ArrowLeft,
   Pencil,
   Check,
+  LogOut,
 } from "lucide-react";
+import { signout } from "../login/actions";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import type { Session } from "@/types";
@@ -58,15 +60,17 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-neutral-50/50 p-6 flex items-start justify-center pt-10">
       <div className="w-full max-w-2xl space-y-6">
-        <div className="flex items-center gap-4">
-          <Link href="/">
-            <Button variant="ghost" size="icon" className="rounded-full">
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-          </Link>
-          <h1 className="text-3xl font-bold tracking-tight text-neutral-900">
-            Admin Dashboard
-          </h1>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link href="/">
+              <Button variant="ghost" size="icon" className="rounded-full">
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+            </Link>
+            <h1 className="text-3xl font-bold tracking-tight text-neutral-900">
+              Admin Dashboard
+            </h1>
+          </div>
         </div>
         <p className="text-neutral-500 pl-14 -mt-4">
           Manage delivery sessions and manifests

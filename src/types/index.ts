@@ -26,3 +26,12 @@ export interface AIScannedArtwork {
   title?: string | null;
   dimensions?: string | null;
 }
+
+export type UserRole = "super_admin" | "admin" | "driver";
+
+export interface Profile {
+  id: string;
+  email: string;
+  role: UserRole;
+  created_at: string;
+}

@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { checkRole } from "@/lib/auth/role-check";
 
 interface ScannedArtwork {
   wacCode: string;
@@ -27,9 +28,9 @@ export async function createSessionWithArtworks(
     return { error: "Client name and email are required" };
   }
 
-  const supabase = await createClient();
-
   try {
+    await checkRole(["admin", "super_admin"]);
+    const supabase = await createClient();
     // 1. Create Session
     const { data: session, error: sessionError } = await supabase
       .from("sessions")

@@ -7,7 +7,8 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, Truck, CheckCircle2, Package, Calendar, ArrowLeft } from "lucide-react";
+import { ChevronRight, Truck, CheckCircle2, Package, Calendar, ArrowLeft, LogOut } from "lucide-react";
+import { signout } from "../login/actions";
 import { Loader2 } from "lucide-react";
 import type { Session } from "@/types";
 
@@ -40,20 +41,22 @@ export default function DeliveryDashboard() {
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 p-6 pt-10">
       <div className="max-w-2xl mx-auto space-y-8">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
             <Link href="/">
-                <Button variant="ghost" size="icon" className="rounded-full">
-                    <ArrowLeft className="w-5 h-5" />
-                </Button>
+              <Button variant="ghost" size="icon" className="rounded-full">
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
             </Link>
             <div className="flex flex-col space-y-1">
-                <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
-                    Driver Dashboard
-                </h1>
-                <p className="text-neutral-500 dark:text-neutral-400 text-sm">
-                    Manage your delivery schedule
-                </p>
+              <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
+                Driver Dashboard
+              </h1>
+              <p className="text-neutral-500 dark:text-neutral-400 text-sm">
+                Manage your delivery schedule
+              </p>
             </div>
+          </div>
         </div>
 
         {loading ? (
