@@ -7,7 +7,7 @@ import { checkRole } from '@/lib/auth/role-check'
 
 export async function updateArtworkStatus(artworkId: string, status: ArtworkStatus, sessionId: string) {
   try {
-    await checkRole(['driver', 'super_admin'])
+    await checkRole(['driver', 'admin', 'super_admin'])
     const supabase = await createClient()
   const { error } = await supabase
     .from('artworks')
